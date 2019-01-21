@@ -1,0 +1,245 @@
+<?php
+namespace App\Modules\Mahasiswa\Controllers;
+
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use App\Modules\Mahasiswa\Models\Mahasiswa;
+use Yajra\Datatables\Datatables;
+use App\Models\UserLevel;
+use App\Models\Content;
+use App\Models\Level;
+use App\Models\Log;
+use App\User;
+use DB;
+use Form;
+
+class MahasiswaController extends Controller
+{
+	protected $slug = 'mahasiswa';
+	protected $module = 'Mahasiswa';
+	protected $title = "Mahasiswa";
+
+	protected $column_title;
+	protected $ajax_field;
+	protected $validation;
+	protected $create_form;
+	protected $update_form;
+
+	public function __construct()
+	{
+		$this->column_title = array('Nama Mahasiswa', 'NIM', 'Username', 'Email', 'Alamat', 'Nomor HP');
+		$this->ajax_field = array(['nama', 'nim', 'username', 'email', 'alamat', 'phone'], [0,1,2,3,4,5]);
+		$this->validation = array(
+			'nama' => 'required|string|max:100',
+			'nim' => 'required|numeric',
+			'email' => 'required|email',
+			'phone' => 'required|numeric',
+			'alamat' => 'required|string',
+		);
+		$this->create_form = array(
+			'Nama' => Form::text('nama', old('nama'), ['class' => 'form-control', 'placeholder' => 'Contoh: Victor Sukarto', ] ),
+			'NIM' => Form::number('nim', old('nim'), ['class' => 'form-control', 'placeholder' => 'Contoh: 4611414043', ] ),
+			'Username' => Form::text('username', old('username'), ['class' => 'form-control', 'placeholder' => 'Contoh: victors', ] ),
+			'Email' => Form::text('email', old('email'), ['class' => 'form-control', 'placeholder' => 'Contoh: victors@mail.com', ] ),
+			'Alamat' => Form::textarea('alamat', old('alamat'), ['class' => 'form-control', 'placeholder' => 'Contoh: Jl. HR. Hardijanto No. 7', 'rows' => '5'] ),
+			'Password' => Form::password('password', ['class' => 'form-control', 'placeholder' => 'Login Password', ] ),
+			'Confirm Password' => Form::password('password_confirmation', ['class' => 'form-control', 'placeholder' => 'Retype Password', ] ),
+			'Nomor HP' => Form::text('phone', old('phone'), ['class' => 'form-control', 'placeholder' => 'Contoh: 081234567890', ] ),
+		);
+		$this->update_form = array(
+			'Nama' => Form::text('nama', old('nama'), ['class' => 'form-control', 'placeholder' => 'Contoh: Sukarto S.Pd., M.Pd.', 'id' => 'nama'] ),
+			'NIM' => Form::number('nim', old('nim'), ['class' => 'form-control', 'placeholder' => 'Contoh: 4611414043', 'id'=>'nip'] ),
+			'Username' => Form::text('username', old('username'), ['class' => 'form-control', 'placeholder' => 'Contoh: victors', 'id'=>'username'] ),
+			'Email' => Form::text('email', old('email'), ['class' => 'form-control', 'placeholder' => 'Contoh: victors@mail.com', 'id' => 'email'] ),
+			'Alamat' => Form::textarea('alamat', old('alamat'), ['class' => 'form-control', 'placeholder' => 'Contoh: Jl. HR. Hardijanto No. 7', 'id' => 'alamat', 'rows' => '5'] ),
+			'Password' => Form::password('password', ['class' => 'form-control', 'placeholder' => 'Login Password or Empty', 'id'=>'password'] ),
+			'Confirm Password' => Form::password('password_confirmation', ['class' => 'form-control', 'placeholder' => 'Retype Password or Empty', 'id'=>'password_confirmation'] ),
+			'Nomor HP' => Form::text('phone', old('phone'), ['class' => 'form-control', 'placeholder' => 'Contoh: 081234567890', 'id'=>'phone'] ),
+		);
+	}
+
+	public function index()
+	{
+		$data['mahasiswa'] = Mahasiswa::all();
+		$data['title'] = $this->title;
+		$data['create_route'] = route($this->slug.'.post.create');
+		$data['update_route'] = route($this->slug.'.post.update', ['id'=>null]);
+		$data['delete_route'] = route($this->slug.'.delete', ['id'=>null]);
+		$data['detail_route'] = route($this->slug.'.details.read', ['id'=>null]);
+		$data['read_route'] = route($this->slug.'.get-data.read');
+		$data['column_title'] = $this->column_title;
+		$data['ajax_field'] = $this->ajax_field;
+		$data['create_form'] = $this->create_form;
+		$data['update_form'] = $this->update_form;
+
+		$data['create_button'] = "";
+		if(Content::menuPermission('create')){
+			$data['create_button'] = '<button class="btn btn-sm btn-default" data-target="#add" data-toggle="modal">
+											<i class="fa fa-plus" aria-hidden="true"></i>
+											<span class="hidden-xs">Tambah '.$this->title.'</span>
+										</button>';
+		}
+
+		return view('Mahasiswa::mahasiswa', $data);
+	}
+
+	public function getData(Datatables $datatables, Request $request)
+	{
+		DB::statement(DB::raw('set @no=0'));
+
+		$data =  Mahasiswa::leftJoin('users', 'mahasiswa.id_user', 'users.id')
+						->get([
+							DB::raw('@no  := @no  + 1 AS no'),
+							'users.id as id',
+							'mahasiswa.id as id_mahasiswa',
+							'users.name as nama',
+							'users.phone as phone',
+							'users.username as username',
+							'mahasiswa.email as email',
+							'mahasiswa.alamat as alamat',
+							'mahasiswa.nim as nim'
+						]);
+
+		$datatables = Datatables::of($data);
+			if ($keyword = $request->get('search')['value']) {
+					$datatables->filterColumn('no', 'whereRaw', '@no  + 1 like ?', ["%{$keyword}%"]);
+			}
+
+		return $datatables
+			->orderColumn('mahasiswa', 'mahasiswa $1')
+			->addColumn('action', function ($data) {
+				$update = "";
+				$validate = "";
+				$delete = "";
+				if(Content::menuPermission('update')){
+					$update = '<button type="button" data-target="#formEditModal" value="'. $data->id .'" data-toggle="modal" class="btn btn-sm btn-outline btn-primary">
+							<i class="fa fa-pencil" aria-hidden="true"></i> Edit
+						</button>';
+				}
+				if(Content::menuPermission('delete')){
+					$delete = '<button type="button" id="confirmDelete" value="'. $data->id .'" class="btn btn-outline  btn-sm btn-danger" data-target="#confirmDeleteModal" data-toggle="modal">
+							<i class="fa fa-trash" aria-hidden="true"></i> Delete
+						</button>';
+				}
+
+				return '
+					<div class="btn-group" aria-label="User Action">'.
+						$update.$delete.$validate
+						.
+					'</div>' ;
+			})
+			->make(true);
+	}
+
+	function postCreate(Request $request)
+	{
+		$this->validation['username'] = 'required|string|max:50|unique:users,username';
+		$this->validation['password'] = 'required|string|min:6|confirmed';
+		$this->validate($request, $this->validation);
+
+		// Add User
+		// 
+        $addedUser = new User;
+
+        $addedUser->name = $request->input('nama');
+        $addedUser->username = $request->input('username');
+        $addedUser->password = bcrypt($request->input('password'));
+        $addedUser->phone = $request->input('phone');
+
+        $addedUser->save();
+
+        // Add Level
+        // id_level_mahasiswa = 5  {!!!!! DILARANG DIUBAH DARI DATABASE !!!!!}
+        // 
+        $userLevels = new UserLevel;
+    	$userLevels->id_user = $addedUser->id;
+    	$userLevels->id_level = 5;
+    	$userLevels->save();
+
+    	// Add Mahasiswa
+    	//
+		$mahasiswa = new Mahasiswa();
+
+		$mahasiswa->id_user = $addedUser->id;
+		$mahasiswa->nim = $request->input('nim');
+		$mahasiswa->email = $request->input('email');
+		$mahasiswa->alamat = $request->input('alamat');
+		$mahasiswa->created_by = Auth::user()->id;
+
+		$mahasiswa->save();
+
+		Log::aktivitas('Menambah '.$this->title.'.');
+
+		return redirect()->back()->with('message_sukses', $this->title.' berhasil ditambahkan!');
+	}
+
+	public function details($id)
+	{
+		return $data['mahasiswa'] = Kalab::leftJoin('users', 'mahasiswa.id_user', 'users.id')
+									->where('users.id', $id)
+									->first([
+										'users.id as id',
+										'users.name as nama',
+										'users.phone as phone',
+										'users.username as username',
+										'mahasiswa.email as email',
+										'mahasiswa.nim as nim',
+										'mahasiswa.alamat as alamat'
+									])
+									->toJson();
+
+	}
+
+	public function postUpdate(Request $request)
+	{
+		if (null !== $request->input('password')) {
+			$this->validation['password'] = 'required|string|min:6|confirmed';
+		}
+
+		$this->validate($request, $this->validation);
+
+		// Update User
+		// 
+		$user = User::find($request->input('edit_id'));
+
+		$user->name = $request->input('nama');
+        $user->username = $request->input('username');
+        $user->phone = $request->input('phone');
+
+        if (null !== $request->input('password')) {
+			$user->password = bcrypt($request->input('password'));
+        }
+
+        $user->save();
+
+		// Update Mahasiswa
+        // 
+		$update['nim'] = $request->input('nim');
+		$update['email'] = $request->input('email');
+		$update['alamat'] = $request->input('alamat');
+		$update['updated_by'] = Auth::user()->id;
+
+		Mahasiswa::where('id_user', $user->id)->update($update);
+
+		Log::aktivitas('Mengubah '.$this->title.'.');
+		return redirect()->back()->with('message_sukses', $this->title.' berhasil diubah!');
+	}
+
+	public function delete($id)
+	{
+		// Delete User
+		// 
+		User::destroy($id);
+		UserLevel::where('id_user', $id)->delete();
+
+		$mahasiswa = Mahasiswa::where('id_user', $id)->first();
+		$mahasiswa->deleted_by = Auth::user()->id;
+		$mahasiswa->save();
+
+		Mahasiswa::destroy($mahasiswa->id);
+		Log::aktivitas('Menghapus '.$this->title.'.');
+		return redirect()->back()->with('message_sukses', $this->title.' berhasil dihapus!');
+	}
+
+}
