@@ -13,6 +13,9 @@ use App\Models\Log;
 use App\User;
 use DB;
 use Form;
+use Session;
+use Excel;
+use File;
 
 class MahasiswaController extends Controller
 {
@@ -25,6 +28,7 @@ class MahasiswaController extends Controller
 	protected $validation;
 	protected $create_form;
 	protected $update_form;
+	protected $upload_form;
 
 	public function __construct()
 	{
@@ -57,6 +61,9 @@ class MahasiswaController extends Controller
 			'Confirm Password' => Form::password('password_confirmation', ['class' => 'form-control', 'placeholder' => 'Retype Password or Empty', 'id'=>'password_confirmation'] ),
 			'Nomor HP' => Form::text('phone', old('phone'), ['class' => 'form-control', 'placeholder' => 'Contoh: 081234567890', 'id'=>'phone'] ),
 		);
+		$this->upload_form = array(
+			'Upload File' => Form::file('file', ['class' => 'form-control', ]),
+		);
 	}
 
 	public function index()
@@ -64,6 +71,7 @@ class MahasiswaController extends Controller
 		$data['mahasiswa'] = Mahasiswa::all();
 		$data['title'] = $this->title;
 		$data['create_route'] = route($this->slug.'.post.create');
+		$data['upload_route'] = route($this->slug.'.post.upload');
 		$data['update_route'] = route($this->slug.'.post.update', ['id'=>null]);
 		$data['delete_route'] = route($this->slug.'.delete', ['id'=>null]);
 		$data['detail_route'] = route($this->slug.'.details.read', ['id'=>null]);
@@ -72,17 +80,67 @@ class MahasiswaController extends Controller
 		$data['ajax_field'] = $this->ajax_field;
 		$data['create_form'] = $this->create_form;
 		$data['update_form'] = $this->update_form;
+		$data['upload_form'] = $this->upload_form;
 
 		$data['create_button'] = "";
+		$data['upload_button'] = "";
 		if(Content::menuPermission('create')){
 			$data['create_button'] = '<button class="btn btn-sm btn-default" data-target="#add" data-toggle="modal">
 											<i class="fa fa-plus" aria-hidden="true"></i>
 											<span class="hidden-xs">Tambah '.$this->title.'</span>
 										</button>';
+			$data['upload_button'] = '<button class="btn btn-sm btn-default" data-target="#addUpload" data-toggle="modal">
+											<i class="fa fa-plus" aria-hidden="true"></i>
+											<span class="hidden-xs">Upload '.$this->title.'</span>
+										</button>';
 		}
 
 		return view('Mahasiswa::mahasiswa', $data);
 	}
+
+	public function postUpload(Request $request){
+	     //validate the xls file
+	  $this->validate($request, array(
+	   'file'      => 'required'
+	  ));
+
+	  if($request->hasFile('file')){
+	   $extension = File::extension($request->file->getClientOriginalName());
+	   if ($extension == "xlsx" || $extension == "xls" || $extension == "csv") {
+
+	    $path = $request->file->getRealPath();
+	    $data = Excel::load($path, function($reader) {
+	    })->get();
+	    if(!empty($data) && $data->count()){
+
+	     foreach ($data as $key => $value) {
+	      $insert[] = [
+	      'nim' => $value->nim,
+	      'alamat' => $value->alamat,
+	      'email' => $value->email,
+	      ];
+	     }
+
+	     if(!empty($insert)){
+
+	      $insertData = DB::table('mahasiswa')->insert($insert);
+	      if ($insertData) {
+	       Session::flash('success', 'Your Data has successfully imported');
+	      }else {                        
+	       Session::flash('error', 'Error inserting the data..');
+	       return back();
+	      }
+	     }
+	    }
+
+	    return back();
+
+	   }else {
+	    Session::flash('error', 'File is a '.$extension.' file.!! Please upload a valid xls/csv file..!!');
+	    return back();
+	   }
+	  }
+	 }
 
 	public function getData(Datatables $datatables, Request $request)
 	{

@@ -14,6 +14,8 @@ Route::group(['namespace' => 'App\Modules'.$nama_modul.'\Controllers','prefix'=>
 
 	Route::get('/delete/{id}', $module.'Controller@delete')->name($slug.'.delete');	//Delete
 
+	Route::post('/upload', $module.'Controller@postUpload')->name($slug.'.post.upload');	//Create
+
 	//custom or additional route goes below
 
 });

@@ -15,6 +15,9 @@ use App\Models\Content;
 use App\Models\Log;
 use DB;
 use Form;
+use Session;
+use Excel;
+use File;
 
 class PraktikumController extends Controller
 {
@@ -27,6 +30,7 @@ class PraktikumController extends Controller
 	protected $validation;
 	protected $create_form;
 	protected $update_form;
+	protected $upload_form;
 
 	public function __construct()
 	{
@@ -60,6 +64,9 @@ class PraktikumController extends Controller
 			'Waktu Mulai' => Form::time('waktu_mulai', old('waktu_mulai'), ['class' => 'form-control timepicker', 'placeholder' => 'Contoh: 10:00 PM', 'id' => 'waktu_mulai'] ),
 			'Waktu Selesai' => Form::time('waktu_selesai', old('waktu_selesai'), ['class' => 'form-control timepicker', 'placeholder' => 'Contoh: 10:00 PM', 'id' => 'waktu_selesai'] ),
 		);
+		$this->upload_form = array(
+			'Upload File' => Form::file('file', ['class' => 'form-control', ]),
+		);
 	}
 
 	public function index()
@@ -67,6 +74,7 @@ class PraktikumController extends Controller
 		$data['praktikum'] = Praktikum::all();
 		$data['title'] = $this->title;
 		$data['create_route'] = route($this->slug.'.aktif.post.create');
+		$data['upload_route'] = route($this->slug.'.aktif.post.upload');
 		$data['update_route'] = route($this->slug.'.aktif.post.update', ['id'=>null]);
 		$data['delete_route'] = route($this->slug.'.aktif.delete', ['id'=>null]);
 		$data['detail_route'] = route($this->slug.'.aktif.details.read', ['id'=>null]);
@@ -78,17 +86,70 @@ class PraktikumController extends Controller
 		$data['ajax_field'] = $this->ajax_field;
 		$data['create_form'] = $this->create_form;
 		$data['update_form'] = $this->update_form;
+		$data['upload_form'] = $this->upload_form;
 
 		$data['create_button'] = "";
+		$data['upload_button'] = "";
 		if(Content::menuPermission('create')){
 			$data['create_button'] = '<button class="btn btn-sm btn-default" data-target="#add" data-toggle="modal">
 											<i class="fa fa-plus" aria-hidden="true"></i>
 											<span class="hidden-xs">Tambah '.$this->title.'</span>
 										</button>';
+			$data['upload_button'] = '<button class="btn btn-sm btn-default" data-target="#addUpload" data-toggle="modal">
+											<i class="fa fa-plus" aria-hidden="true"></i>
+											<span class="hidden-xs">Upload '.$this->title.'</span>
+										</button>';
 		}
 
 		return view('Praktikum::praktikum', $data);
 	}
+
+	public function postUpload(Request $request){
+	     //validate the xls file
+	  $this->validate($request, array(
+	   'file'      => 'required'
+	  ));
+
+	  if($request->hasFile('file')){
+	   $extension = File::extension($request->file->getClientOriginalName());
+	   if ($extension == "xlsx" || $extension == "xls" || $extension == "csv") {
+
+	    $path = $request->file->getRealPath();
+	    $data = Excel::load($path, function($reader) {
+	    })->get();
+	    if(!empty($data) && $data->count()){
+
+	     foreach ($data as $key => $value) {
+	      $insert[] = [
+	      'praktikum' => $value->praktikum,
+	      'id_laboratorium' => $value->laboratorium,
+	      'id_user_dosen' => $value->dosen,
+	      'id_hari' => $value->hari,
+	      'waktu_mulai' => $value->waktu_mulai,
+	      'waktu_selesai' => $value->waktu_selesai,
+	      ];
+	     }
+
+	     if(!empty($insert)){
+
+	      $insertData = DB::table('praktikum')->insert($insert);
+	      if ($insertData) {
+	       Session::flash('success', 'Your Data has successfully imported');
+	      }else {                        
+	       Session::flash('error', 'Error inserting the data..');
+	       return back();
+	      }
+	     }
+	    }
+
+	    return back();
+
+	   }else {
+	    Session::flash('error', 'File is a '.$extension.' file.!! Please upload a valid xls/csv file..!!');
+	    return back();
+	   }
+	  }
+	 }
 
 	public function getData(Datatables $datatables, Request $request)
 	{

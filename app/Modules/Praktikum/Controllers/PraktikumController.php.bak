@@ -21,7 +21,6 @@ class PraktikumController extends Controller
 	protected $slug = 'praktikum';
 	protected $module = 'Praktikum';
 	protected $title = "Praktikum Aktif";
-	protected $title_mahasiswa = "Mahasiswa Aktif";
 
 	protected $column_title;
 	protected $ajax_field;
@@ -81,15 +80,10 @@ class PraktikumController extends Controller
 		$data['update_form'] = $this->update_form;
 
 		$data['create_button'] = "";
-		$data['create_mahasiswa'] = "";
 		if(Content::menuPermission('create')){
 			$data['create_button'] = '<button class="btn btn-sm btn-default" data-target="#add" data-toggle="modal">
 											<i class="fa fa-plus" aria-hidden="true"></i>
 											<span class="hidden-xs">Tambah '.$this->title.'</span>
-										</button>';
-			$data['create_mahasiswa'] = '<button class="btn btn-sm btn-default" data-target="#addMahasiswa" data-toggle="modal">
-											<i class="fa fa-plus" aria-hidden="true"></i>
-											<span class="hidden-xs">Tambah '.$this->title_mahasiswa.'</span>
 										</button>';
 		}
 

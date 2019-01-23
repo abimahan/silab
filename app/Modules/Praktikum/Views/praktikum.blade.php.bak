@@ -16,7 +16,7 @@ use App\Models\Content;
 @endsection
 
 @section('content-header-right')
-  {!! $create_mahasiswa !!} {!! $create_button !!}
+  {!! $create_button !!}
 @endsection
 
 @section('content')
@@ -85,41 +85,6 @@ use App\Models\Content;
   	</div>
   </div>
   <!-- //Add User Modals -->
-
-  <!-- Add User Modals Mahasiswa -->
-  <div class="modal fade" id="addMahasiswa" aria-hidden="false" aria-labelledby="adduserModalLabel" role="dialog" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h4 class="modal-title" id="myModalLabel">Tambah deneng {{ $title }}</h4>
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-        </div>
-        <div class="modal-body">
-          <form class="form-horizontal form-element" action="{{ $create_route }}" method="POST">
-            {{ csrf_field() }}
-            @foreach ($create_form as $key => $value)
-              <div class="row form-group {{ $errors->has($key) ? ' has-error' : '' }}">
-                  <label class="col-sm-3 control-label" for="{{$key}}">{{ ucfirst($key) }}</label>
-                  <div class="col-sm-9">
-                      {{ $value }}
-                      @if ($errors->has($key))
-                          <span class="help-block">
-                              <strong>{{ $errors->first($key) }}</strong>
-                          </span>
-                      @endif
-                  </div>
-              </div>
-            @endforeach
-
-              <div class="row col-md-3 pull-right">
-                    <button class="btn btn-primary btn-outline" type="submit">Submit</button>
-                </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- //Add User Modals Mahasiswa -->
 
   <!-- Modal Delete Confirm -->
   <div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">

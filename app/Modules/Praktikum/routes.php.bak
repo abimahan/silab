@@ -28,6 +28,4 @@ Route::group(['namespace' => 'App\Modules'.$nama_modul.'\Controllers','prefix'=>
 
 	Route::get('/nilai/print/{id}', $module.'Controller@printNilaiPraktikum')->name($slug.'.nilai.print.read');	//Read
 
-	Route::post('/upload', $module.'Controller@postUpload')->name($slug.'.aktif.post.upload');	//Upload
-
 });
